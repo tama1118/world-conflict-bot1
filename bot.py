@@ -50,6 +50,10 @@ MAX_FINAL_CANDIDATES = 30
 MAX_OUTPUT_ITEMS = 5
 HISTORY_FILE = "sent_articles.json"
 
+REQUEST_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (compatible; AI-News-Bot/1.0)"
+}
+
 
 def now_jst_str() -> str:
     return datetime.now(ZoneInfo("Asia/Tokyo")).strftime("%Y-%m-%d %H:%M:%S JST")
@@ -101,6 +105,50 @@ def extract_json_object(text: str) -> dict:
     raise ValueError("JSONオブジェクトを抽出できませんでした。")
 
 
+def clean_summary_text(summary: str) -> str:
+    summary = re.sub(r"<[^>]+>", " ", summary or "")
+    summary = re.sub(r"\s+", " ", summary).strip()
+    return summary
+
+
+def resolve_final_url(url: str) -> str:
+    """
+    Google News のような中継URLを、できるだけ最終URLに解決する。
+    失敗したら元URLを返す。
+    """
+    if not url:
+        return url
+
+    try:
+        response = requests.get(
+            url,
+            headers=REQUEST_HEADERS,
+            timeout=15,
+            allow_redirects=True,
+        )
+        final_url = str(response.url).strip()
+        if final_url:
+            return final_url
+    except requests.RequestException:
+        pass
+
+    return url
+
+
+def suppress_discord_embeds(text: str) -> str:
+    """
+    Discordの埋め込みカードを抑えるため、
+    URLを <...> で囲む。
+    """
+    def repl(match):
+        url = match.group(0)
+        if url.startswith("<") and url.endswith(">"):
+            return url
+        return f"<{url}>"
+
+    return re.sub(r"https?://[^\s>]+", repl, text)
+
+
 def fetch_feed_items(feed_urls: list[str], sent_history: set[str]) -> list[dict]:
     items = []
 
@@ -110,7 +158,7 @@ def fetch_feed_items(feed_urls: list[str], sent_history: set[str]) -> list[dict]
 
         for entry in feed.entries:
             title = getattr(entry, "title", "")
-            summary = getattr(entry, "summary", "")
+            summary = clean_summary_text(getattr(entry, "summary", ""))
             link = getattr(entry, "link", "")
 
             if not link or link in sent_history:
@@ -229,21 +277,26 @@ def fetch_search_results(queries: list[str], sent_history: set[str]) -> list[dic
                 break
 
             title = getattr(entry, "title", "")
-            summary = getattr(entry, "summary", "")
-            link = getattr(entry, "link", "")
+            summary = clean_summary_text(getattr(entry, "summary", ""))
+            raw_link = getattr(entry, "link", "")
 
-            if not link or link in sent_history:
+            if not raw_link:
+                continue
+
+            final_link = resolve_final_url(raw_link)
+
+            if final_link in sent_history:
                 continue
 
             scored = score_entry(title, summary)
             if scored <= 0:
-                scored = 1  # 検索ヒット分として最低スコア付与
+                scored = 1
 
             items.append(
                 {
                     "title": title,
                     "summary": summary,
-                    "link": link,
+                    "link": final_link,
                     "score": scored + 1,
                     "source": source_name,
                 }
@@ -311,7 +364,6 @@ def choose_top_items_with_openai(client: OpenAI, items: list[dict]) -> list[dict
         except (ValueError, TypeError):
             continue
 
-    # 念のため再重複除去
     return dedupe_items(selected, MAX_OUTPUT_ITEMS)
 
 
@@ -336,25 +388,30 @@ def build_summary_prompt(selected_items: list[dict], queries: list[str]) -> str:
     return textwrap.dedent(
         f"""
         あなたはAI/ローカルLLM/GPUニュース専門の編集者です。
-        以下の選定済み記事を、Discord向けに日本語でわかりやすく要約してください。
+        以下の選定済み記事を、Discord向けに日本語で見やすく要約してください。
 
         ルール:
         - 日本語で出力
         - 誇張しない
-        - 各ニュースは以下の形式にする
+        - 1記事あたり「見出し + 箇条書き2つ + URL」にする
+        - 箇条書きは短めにする
+        - 「何が起きたか」は1行
+        - 「なぜ重要か」は1行
+        - 無駄な前置きは不要
+        - URLはそのまま1行で出す
 
+        出力形式:
         1. 見出し
         ・何が起きたか
         ・なぜ重要か
         ・URL
 
-        - 最後に必ず以下を入れる
-
+        最後に必ず以下を入れる:
         ---
         今日のひとこと:
         〇〇
 
-        - 検索で深掘りしたクエリ:
+        検索で深掘りしたクエリ:
         {query_text}
 
         選定済み記事:
@@ -410,9 +467,15 @@ def post_to_discord(message: str) -> None:
         print("DISCORD_WEBHOOK_URL 未設定のため、Discord送信をスキップします。")
         return
 
-    chunks = split_message_for_discord(message)
+    safe_message = suppress_discord_embeds(message)
+    chunks = split_message_for_discord(safe_message)
+
     for chunk in chunks:
-        res = requests.post(DISCORD_WEBHOOK_URL, json={"content": chunk}, timeout=30)
+        res = requests.post(
+            DISCORD_WEBHOOK_URL,
+            json={"content": chunk},
+            timeout=30,
+        )
         res.raise_for_status()
 
 
