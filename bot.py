@@ -48,7 +48,9 @@ MAX_SEARCH_QUERIES = 3
 MAX_SEARCH_RESULTS_PER_QUERY = 5
 MAX_FINAL_CANDIDATES = 30
 MAX_OUTPUT_ITEMS = 5
+
 HISTORY_FILE = "sent_articles.json"
+MEMORY_FILE = "daily_memory.json"
 
 REQUEST_HEADERS = {
     "User-Agent": "Mozilla/5.0 (compatible; AI-News-Bot/1.0)"
@@ -61,6 +63,27 @@ def now_jst_str() -> str:
 
 def normalize_text(text: str) -> str:
     return " ".join((text or "").lower().split())
+
+
+def clean_summary_text(summary: str) -> str:
+    summary = re.sub(r"<[^>]+>", " ", summary or "")
+    summary = re.sub(r"\s+", " ", summary).strip()
+    return summary
+
+
+def extract_json_object(text: str) -> dict:
+    text = text.strip()
+
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+
+    match = re.search(r"\{.*\}", text, re.DOTALL)
+    if match:
+        return json.loads(match.group(0))
+
+    raise ValueError("JSONオブジェクトを抽出できませんでした。")
 
 
 def load_history() -> set[str]:
@@ -81,6 +104,26 @@ def save_history(history: set[str]) -> None:
         json.dump(sorted(history), f, ensure_ascii=False, indent=2)
 
 
+def load_memory() -> dict:
+    try:
+        with open(MEMORY_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            if isinstance(data, dict):
+                if "last_topics" not in data:
+                    data["last_topics"] = []
+                return data
+            return {"last_topics": []}
+    except FileNotFoundError:
+        return {"last_topics": []}
+    except json.JSONDecodeError:
+        return {"last_topics": []}
+
+
+def save_memory(memory: dict) -> None:
+    with open(MEMORY_FILE, "w", encoding="utf-8") as f:
+        json.dump(memory, f, ensure_ascii=False, indent=2)
+
+
 def score_entry(title: str, summary: str) -> int:
     text = normalize_text(f"{title} {summary}")
     score = 0
@@ -88,27 +131,6 @@ def score_entry(title: str, summary: str) -> int:
         if kw in text:
             score += 1
     return score
-
-
-def extract_json_object(text: str) -> dict:
-    text = text.strip()
-
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        pass
-
-    match = re.search(r"\{.*\}", text, re.DOTALL)
-    if match:
-        return json.loads(match.group(0))
-
-    raise ValueError("JSONオブジェクトを抽出できませんでした。")
-
-
-def clean_summary_text(summary: str) -> str:
-    summary = re.sub(r"<[^>]+>", " ", summary or "")
-    summary = re.sub(r"\s+", " ", summary).strip()
-    return summary
 
 
 def resolve_final_url(url: str) -> str:
@@ -137,8 +159,7 @@ def resolve_final_url(url: str) -> str:
 
 def suppress_discord_embeds(text: str) -> str:
     """
-    Discordの埋め込みカードを抑えるため、
-    URLを <...> で囲む。
+    Discordの埋め込みカードを抑えるため URL を <...> で囲む。
     """
     def repl(match):
         url = match.group(0)
@@ -367,7 +388,11 @@ def choose_top_items_with_openai(client: OpenAI, items: list[dict]) -> list[dict
     return dedupe_items(selected, MAX_OUTPUT_ITEMS)
 
 
-def build_summary_prompt(selected_items: list[dict], queries: list[str]) -> str:
+def build_summary_prompt(
+    selected_items: list[dict],
+    queries: list[str],
+    yesterday_topics: list[str],
+) -> str:
     bullets = []
     for i, item in enumerate(selected_items, start=1):
         bullets.append(
@@ -384,6 +409,7 @@ def build_summary_prompt(selected_items: list[dict], queries: list[str]) -> str:
 
     joined = "\n\n".join(bullets)
     query_text = ", ".join(queries) if queries else "なし"
+    yesterday_text = "\n".join(f"- {t}" for t in yesterday_topics) if yesterday_topics else "なし"
 
     return textwrap.dedent(
         f"""
@@ -399,6 +425,8 @@ def build_summary_prompt(selected_items: list[dict], queries: list[str]) -> str:
         - 「なぜ重要か」は1行
         - 無駄な前置きは不要
         - URLはそのまま1行で出す
+        - 最後の「今日のひとこと」では、必要なら昨日との流れや継続テーマにも少し触れてよい
+        - ただし過剰に分析しすぎない
 
         出力形式:
         1. 見出し
@@ -414,6 +442,9 @@ def build_summary_prompt(selected_items: list[dict], queries: list[str]) -> str:
         検索で深掘りしたクエリ:
         {query_text}
 
+        昨日の主要トピック:
+        {yesterday_text}
+
         選定済み記事:
         {joined}
         """
@@ -421,11 +452,14 @@ def build_summary_prompt(selected_items: list[dict], queries: list[str]) -> str:
 
 
 def summarize_selected_items_with_openai(
-    client: OpenAI, selected_items: list[dict], queries: list[str]
+    client: OpenAI,
+    selected_items: list[dict],
+    queries: list[str],
+    yesterday_topics: list[str],
 ) -> str:
     response = client.responses.create(
         model=OPENAI_MODEL,
-        input=build_summary_prompt(selected_items, queries),
+        input=build_summary_prompt(selected_items, queries, yesterday_topics),
     )
 
     if hasattr(response, "output_text") and response.output_text:
@@ -488,6 +522,13 @@ def update_history(sent_items: list[dict]) -> None:
     save_history(history)
 
 
+def update_memory(selected_items: list[dict]) -> None:
+    memory = load_memory()
+    today_topics = [item["title"] for item in selected_items]
+    memory["last_topics"] = today_topics
+    save_memory(memory)
+
+
 def main() -> None:
     print(f"[{now_jst_str()}] ニュース収集開始")
     print(f"OPENAI_MODEL={OPENAI_MODEL}")
@@ -499,6 +540,8 @@ def main() -> None:
 
     client = OpenAI(api_key=OPENAI_API_KEY)
     sent_history = load_history()
+    memory = load_memory()
+    yesterday_topics = memory.get("last_topics", [])
 
     initial_items = fetch_initial_candidates(sent_history)
     print(f"初期候補記事数: {len(initial_items)}")
@@ -523,7 +566,13 @@ def main() -> None:
         print("送信対象の記事が選ばれませんでした。")
         return
 
-    digest = summarize_selected_items_with_openai(client, selected_items, search_queries)
+    digest = summarize_selected_items_with_openai(
+        client,
+        selected_items,
+        search_queries,
+        yesterday_topics,
+    )
+
     header = f"📡 AIニュース速報 ({now_jst_str()})\n"
     final_message = header + "\n" + digest
 
@@ -531,7 +580,10 @@ def main() -> None:
     post_to_discord(final_message)
 
     update_history(selected_items)
+    update_memory(selected_items)
+
     print("履歴を更新しました。")
+    print("メモリを更新しました。")
     print("完了")
 
 
