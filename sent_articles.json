@@ -15,8 +15,11 @@
   "https://news.google.com/rss/articles/CBMixwJBVV95cUxQaDR4NFVyNEJlZTRUWHBOR25XNk9DaktlaDhjRl9WZld0aVBhN2h3ZEV1TTJHLWgxeGRsZnI3U3BLLUhwb3ZEcDUwTVdSUmxnaTMyLUNITUgza0RWQUVmY1JPQnd5V3F4NlBVY2czMUZva01uNFh2N3FDSUptVnM1Um53MDNlbElwTThDb0hlbmdXOFN4Q1psVk40MmljcHhHdERwZmlkQ2dhMWNucmpUV1JoT0syTkprOU9kNEVOcWlSdTYybEFHTUdhckVMa0xYZnVrU1JvTjBKZDJLaFYxQ2dTWUNPZ1FXbE9DV2NFM2lKMUgtcUdXN0trYlpyZEhJNXpFQXhfV0RFSllTaVhpak1ETHBEMDV3RVl3T2J5STlwNlFuaXZ4aFRsZWtFT1ZLcklMdnZBa3ItTzdycEFfMFhWTU5Sam8?oc=5",
   "https://news.google.com/rss/articles/CBMixwJBVV95cUxQaDR4NFVyNEJlZTRUWHBOR25XNk9DaktlaDhjRl9WZld0aVBhN2h3ZEV1TTJHLWgxeGRsZnI3U3BLLUhwb3ZEcDUwTVdSUmxnaTMyLUNITUgza0RWQUVmY1JPQnd5V3F4NlBVY2czMUZva01uNFh2N3FDSUptVnM1Um53MDNlbElwTThDb0hlbmdXOFN4Q1psVk40MmljcHhHdERwZmlkQ2dhMWNucmpUV1JoT0syTkprOU9kNEVOcWlSdTYybEFHTUdhckVMa0xYZnVrU1JvTjBKZDJLaFYxQ2dTWUNPZ1FXbE9DV2NFM2lKMUgtcUdXN0trYlpyZEhJNXpFQXhfV0RFSllTaVhpak1ETHBEMDV3RVl3T2J5STlwNlFuaXZ4aFRsZWtFT1ZLcklMdnZBa3ItTzdycEFfMFhWTU5Sam8?oc=5&hl=en-US&gl=US&ceid=US:en",
   "https://news.google.com/rss/articles/CBMizwFBVV95cUxNQnRaazVSUTBwV1FsN1d3c1NzQ3UwbmYzVk5GT2ZuNG02MnhEZzdDNE55bjZhWXVZUjZPRU9TWVZsa0pWazNGUHdSMEJuYzdFUDJvN2pHUjJRWV9JY1ZFdXJHeERPdU9iUldPZm1ZQl9kZHJyVDBrNkVIaDlBTGgzbVUtZUJoNGRUb0FvbmpWTEI2UWRWdUo5aTZFX2Rsb3dzUXJQVHpFTmlXUXdySlpOTF85NWF0cFFKcDlnNm10eDNPbjM5ZjB3aWhZYWVFRWc?oc=5",
+  "https://venturebeat.com/data/googles-gemini-embedding-2-arrives-with-native-multimodal-support-to-cut",
   "https://venturebeat.com/data/openai-upgrades-chatgpt-with-interactive-learning-tools-as-lawsuits-and",
   "https://venturebeat.com/infrastructure/how-to-make-your-e-commerce-product-visible-to-ai-agents-use-this-new-system",
+  "https://venturebeat.com/infrastructure/manufact-raises-usd6-3m-as-mcp-becomes-the-usb-c-for-ai-powering-chatgpt-and",
+  "https://venturebeat.com/orchestration/anthropic-gives-claude-shared-context-across-microsoft-excel-and-powerpoint",
   "https://venturebeat.com/orchestration/google-upgrades-gemini-for-workspace-allowing-it-to-pull-data-from-multiple",
   "https://venturebeat.com/orchestration/microsoft-announces-copilot-cowork-with-help-from-anthropic-a-cloud-powered",
   "https://venturebeat.com/security/anthropic-openai-sast-reasoning-scanners-security-directors-guide",
@@ -27,5 +30,7 @@
   "https://venturebeat.com/technology/the-limits-of-bubble-thinking-how-ai-breaks-every-historical-analogy",
   "https://www.theverge.com/ai-artificial-intelligence/892178/meta-moltbook-acquisition-ai-agents",
   "https://www.theverge.com/tech/891998/adobe-photoshop-web-mobile-ai-assistant-beta-launch",
-  "https://www.tomshardware.com/tech-industry/artificial-intelligence/nvidia-reportedly-building-its-own-ai-agent-to-compete-with-openclaw-report-claims-nemoclaw-will-supposedly-be-open-source-and-designed-for-enterprise-use"
+  "https://www.tomshardware.com/tech-industry/artificial-intelligence/crafty-ai-tool-caught-repurposing-its-training-gpus-for-unauthorized-crypto-mining-during-testing-experimental-agent-breached-safety-controllability-and-trustworthiness-barriers",
+  "https://www.tomshardware.com/tech-industry/artificial-intelligence/nvidia-reportedly-building-its-own-ai-agent-to-compete-with-openclaw-report-claims-nemoclaw-will-supposedly-be-open-source-and-designed-for-enterprise-use",
+  "https://www.tomshardware.com/tech-industry/artificial-intelligence/openclaw-ai-agent-craze-sweeps-china-as-authorities-seek-to-clamp-down-amid-security-fears-adoption-surges-as-state-run-enterprises-are-barred-from-use"
 ]
