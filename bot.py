@@ -11,32 +11,39 @@ import requests
 from openai import OpenAI
 
 RSS_FEEDS = [
-    "https://feeds.feedburner.com/venturebeat/SZYF",
-    "https://www.theverge.com/rss/ai-artificial-intelligence/index.xml",
-    "https://www.tomshardware.com/feeds/all",
+    "https://feeds.reuters.com/Reuters/worldNews",
+    "https://feeds.bbci.co.uk/news/world/rss.xml",
+    "https://rss.dw.com/rdf/rss-en-world",
+    "https://www.aljazeera.com/xml/rss/all.xml",
 ]
 
 KEYWORDS = [
-    "local llm",
-    "ollama",
-    "lm studio",
-    "qwen",
-    "deepseek",
-    "llama",
-    "gemma",
-    "mistral",
-    "mixtral",
-    "phi",
-    "vllm",
-    "rag",
-    "ai agent",
-    "agentic",
-    "inference",
-    "gpu",
-    "cuda",
-    "tensorrt",
-    "open source ai",
-    "open-source ai",
+    "ukraine",
+    "russia",
+    "israel",
+    "gaza",
+    "iran",
+    "syria",
+    "china",
+    "taiwan",
+    "south china sea",
+    "nato",
+    "missile",
+    "drone",
+    "air defense",
+    "ceasefire",
+    "sanctions",
+    "military",
+    "defense",
+    "conflict",
+    "war",
+    "security",
+    "geopolitics",
+    "troops",
+    "strike",
+    "artillery",
+    "navy",
+    "air force",
 ]
 
 DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL", "")
@@ -53,7 +60,7 @@ HISTORY_FILE = "sent_articles.json"
 MEMORY_FILE = "daily_memory.json"
 
 REQUEST_HEADERS = {
-    "User-Agent": "Mozilla/5.0 (compatible; AI-News-Bot/1.0)"
+    "User-Agent": "Mozilla/5.0 (compatible; World-Conflict-Bot/1.0)"
 }
 
 
@@ -134,10 +141,6 @@ def score_entry(title: str, summary: str) -> int:
 
 
 def resolve_final_url(url: str) -> str:
-    """
-    Google News のような中継URLを、できるだけ最終URLに解決する。
-    失敗したら元URLを返す。
-    """
     if not url:
         return url
 
@@ -158,9 +161,6 @@ def resolve_final_url(url: str) -> str:
 
 
 def suppress_discord_embeds(text: str) -> str:
-    """
-    Discordの埋め込みカードを抑えるため URL を <...> で囲む。
-    """
     def repl(match):
         url = match.group(0)
         if url.startswith("<") and url.endswith(">"):
@@ -237,12 +237,12 @@ def build_search_query_prompt(items: list[dict]) -> str:
 
     return textwrap.dedent(
         f"""
-        あなたはAIニュースの調査担当です。
+        あなたは世界情勢・安全保障ニュースの調査担当です。
         以下の候補記事を見て、追加調査すべき検索クエリを最大{MAX_SEARCH_QUERIES}個だけ作成してください。
 
         条件:
         - 英語の短い検索クエリ
-        - AI/ローカルLLM/GPU/AIエージェント関連を優先
+        - 戦争、軍事、安全保障、外交、制裁、地政学関連を優先
         - 曖昧すぎる語は避ける
         - 重複クエリは避ける
         - JSONのみで返す
@@ -347,12 +347,13 @@ def build_selection_prompt(items: list[dict]) -> str:
 
     return textwrap.dedent(
         f"""
-        あなたはAIニュース編集長です。
+        あなたは世界情勢ニュースの編集長です。
         候補記事から、今日送るべき重要ニュースを最大{MAX_OUTPUT_ITEMS}件選んでください。
 
         条件:
-        - AI、ローカルLLM、GPU推論、AIエージェント、OSS AIを優先
+        - 戦争、軍事、安全保障、地政学、外交、制裁関連を優先
         - 同じ話題の重複は避ける
+        - 煽り気味の見出しより、実質的に重要な記事を優先
         - JSONのみで返す
         - index は上の候補番号を使う
         - 形式:
@@ -413,20 +414,23 @@ def build_summary_prompt(
 
     return textwrap.dedent(
         f"""
-        あなたはAI/ローカルLLM/GPUニュース専門の編集者です。
+        あなたは世界情勢・安全保障ニュース専門の編集者です。
         以下の選定済み記事を、Discord向けに日本語で見やすく要約してください。
 
         ルール:
         - 日本語で出力
         - 誇張しない
+        - 煽らない
+        - 未確認情報は断定しない
         - 1記事あたり「見出し + 箇条書き2つ + URL」にする
         - 箇条書きは短めにする
         - 「何が起きたか」は1行
         - 「なぜ重要か」は1行
         - 無駄な前置きは不要
         - URLはそのまま1行で出す
+        - 被害描写はセンセーショナルにしない
         - 最後の「今日のひとこと」では、必要なら昨日との流れや継続テーマにも少し触れてよい
-        - ただし過剰に分析しすぎない
+        - ただし分析しすぎず、事実ベース寄りにする
 
         出力形式:
         1. 見出し
@@ -573,7 +577,7 @@ def main() -> None:
         yesterday_topics,
     )
 
-    header = f"📡 AIニュース速報 ({now_jst_str()})\n"
+    header = f"🌍 世界情勢速報 ({now_jst_str()})\n"
     final_message = header + "\n" + digest
 
     print(final_message)
