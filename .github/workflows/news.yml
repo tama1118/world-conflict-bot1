@@ -1,4 +1,4 @@
-name: AI News Bot
+name: World Conflict Bot
 
 on:
   workflow_dispatch:
