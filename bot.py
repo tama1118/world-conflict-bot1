@@ -174,7 +174,7 @@ def fetch_feed_items(feed_urls: list[str], sent_history: set[str]) -> list[dict]
     items = []
 
     for url in feed_urls:
-        feed = feedparser.parse(url)
+        feed = feedparser.parse(url, request_headers=REQUEST_HEADERS)
         source_name = getattr(feed.feed, "title", url)
 
         for entry in feed.entries:
@@ -289,7 +289,7 @@ def fetch_search_results(queries: list[str], sent_history: set[str]) -> list[dic
 
     for query in queries:
         rss_url = build_google_news_rss_url(query)
-        feed = feedparser.parse(rss_url)
+        feed = feedparser.parse(rss_url, request_headers=REQUEST_HEADERS)
         source_name = f"Google News Search: {query}"
 
         count = 0
@@ -512,6 +512,7 @@ def post_to_discord(message: str) -> None:
         res = requests.post(
             DISCORD_WEBHOOK_URL,
             json={"content": chunk},
+            headers=REQUEST_HEADERS,
             timeout=30,
         )
         res.raise_for_status()
