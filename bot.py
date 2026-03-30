@@ -257,16 +257,55 @@ def build_search_query_prompt(items: list[dict]) -> str:
     ).strip()
 
 
+def call_openai_text(client: OpenAI, prompt: str, japanese_only: bool = False) -> str:
+    system_text = "あなたは正確で簡潔なアシスタントです。"
+    if japanese_only:
+        system_text = (
+            "あなたは日本語でのみ出力するアシスタントです。"
+            "出力は必ず自然な日本語のみで行ってください。"
+            "英語のみの出力、英語見出し、英語の箇条書きは禁止です。"
+            "URL・固有名詞・組織名・人名など必要最小限の英字は保持して構いません。"
+        )
+
+    response = client.responses.create(
+        model=OPENAI_MODEL,
+        input=[
+            {
+                "role": "system",
+                "content": system_text,
+            },
+            {
+                "role": "user",
+                "content": prompt,
+            },
+        ],
+    )
+
+    if getattr(response, "output_text", None):
+        return response.output_text.strip()
+
+    texts = []
+    for item in getattr(response, "output", []) or []:
+        for content in getattr(item, "content", []) or []:
+            text = getattr(content, "text", None)
+            if text:
+                texts.append(text)
+
+    if texts:
+        return "\n".join(texts).strip()
+
+    raise RuntimeError("OpenAI response をテキスト化できませんでした。")
+
+
 def propose_search_queries_with_openai(client: OpenAI, items: list[dict]) -> list[str]:
     if not items:
         return []
 
-    response = client.responses.create(
-        model=OPENAI_MODEL,
-        input=build_search_query_prompt(items),
+    text = call_openai_text(
+        client=client,
+        prompt=build_search_query_prompt(items),
+        japanese_only=False,
     )
-
-    text = response.output_text.strip() if getattr(response, "output_text", None) else ""
     data = extract_json_object(text)
     queries = data.get("queries", [])
 
@@ -368,12 +407,11 @@ def build_selection_prompt(items: list[dict]) -> str:
 
 
 def choose_top_items_with_openai(client: OpenAI, items: list[dict]) -> list[dict]:
-    response = client.responses.create(
-        model=OPENAI_MODEL,
-        input=build_selection_prompt(items),
+    text = call_openai_text(
+        client=client,
+        prompt=build_selection_prompt(items),
+        japanese_only=False,
     )
-
-    text = response.output_text.strip() if getattr(response, "output_text", None) else ""
     data = extract_json_object(text)
     indexes = data.get("selected_indexes", [])
 
@@ -415,10 +453,12 @@ def build_summary_prompt(
     return textwrap.dedent(
         f"""
         あなたは世界情勢・安全保障ニュース専門の編集者です。
-        以下の選定済み記事を、Discord向けに日本語で見やすく要約してください。
+        以下の選定済み記事を、Discord向けに見やすく要約してください。
 
         ルール:
-        - 日本語で出力
+        - 出力は必ず日本語のみ
+        - 英語のみの文章、英語見出し、英語の箇条書きは禁止
+        - ただし URL、固有名詞、組織名、人名など必要最小限の英字は可
         - 誇張しない
         - 煽らない
         - 未確認情報は断定しない
@@ -455,31 +495,43 @@ def build_summary_prompt(
     ).strip()
 
 
+def contains_too_much_english(text: str) -> bool:
+    text_wo_url = re.sub(r"https?://\S+", " ", text)
+    english_words = re.findall(r"\b[A-Za-z]{4,}\b", text_wo_url)
+    return len(english_words) >= 20
+
+
 def summarize_selected_items_with_openai(
     client: OpenAI,
     selected_items: list[dict],
     queries: list[str],
     yesterday_topics: list[str],
 ) -> str:
-    response = client.responses.create(
-        model=OPENAI_MODEL,
-        input=build_summary_prompt(selected_items, queries, yesterday_topics),
+    prompt = build_summary_prompt(selected_items, queries, yesterday_topics)
+
+    digest = call_openai_text(
+        client=client,
+        prompt=prompt,
+        japanese_only=True,
     )
 
-    if hasattr(response, "output_text") and response.output_text:
-        return response.output_text.strip()
+    if contains_too_much_english(digest):
+        print("英語が多く含まれていたため、日本語で再生成します。")
 
-    texts = []
-    for item in getattr(response, "output", []) or []:
-        for content in getattr(item, "content", []) or []:
-            text = getattr(content, "text", None)
-            if text:
-                texts.append(text)
+        retry_prompt = (
+            prompt
+            + "\n\n重要: 前回の出力は英語が多すぎました。"
+              "今回は必ず自然な日本語のみで書き直してください。"
+              "英語の説明文や英語見出しは禁止です。"
+        )
 
-    if texts:
-        return "\n".join(texts).strip()
+        digest = call_openai_text(
+            client=client,
+            prompt=retry_prompt,
+            japanese_only=True,
+        )
 
-    raise RuntimeError("OpenAI response をテキスト化できませんでした。")
+    return digest
 
 
 def split_message_for_discord(message: str, max_len: int = 1800) -> list[str]:
